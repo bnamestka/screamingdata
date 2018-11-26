@@ -1,0 +1,40 @@
+#!/usr/bin/env bash
+
+set -e
+
+PI_SD=/Volumes/boot
+DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null && pwd )"
+
+# source utils
+source $DIR/../lib/utils.sh
+
+# parse options
+source $DIR/../lib/parse-options.sh
+
+# ensure sd card is mounted
+if [ ! -d $PI_SD ]; then
+    exit_with_error "Could not find the SD card. Is it mounted?"
+fi
+
+# ensure required options are supplied
+if [ -z "$SSID_NAME" ] || [ -z "$SSID_PASSWORD" ]; then
+    exit_with_error "You must specify --ssid-name, and --ssid-password to set up the SD card!"
+fi
+
+cd $PI_SD
+
+# enable SSH access
+touch ssh
+
+# enable headless wifi
+cat > wpa_supplicant.conf <<EOF
+country=US
+ctrl_interface=DIR=/var/run/wpa_supplicant GROUP=netdev
+update_config=1
+network={
+    ssid="${SSID_NAME}"
+    psk="${SSID_PASSWORD}"
+}
+EOF
+
+echo "It is now safe to eject the SD card!"

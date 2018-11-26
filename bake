@@ -1,0 +1,25 @@
+#!/usr/bin/env bash
+
+usage() {
+  cat <<"EOF"
+USAGE:
+  bake                  : show this message
+  bake sd               : bake the SD card
+  bake pi               : bake the Raspberry Pi
+EOF
+}
+
+main(){
+  # execute proper command
+  case $1 in
+    sd|pi)
+      bash ./cmd/$1 ${@:2}
+      ;;
+    *)
+      usage
+      exit 1
+      ;;
+  esac
+}
+
+main $@

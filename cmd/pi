@@ -1,0 +1,63 @@
+#!/usr/bin/env bash
+
+set -e
+
+ID=$(uuidgen)
+SCREAMINGDATA_KEY_LOCATION="${HOME}/.ssh/screamingdata"
+PUBKEY=$(cat ${SCREAMINGDATA_KEY_LOCATION}.pub)
+PI_USER=pi
+PI_ADDRESS=raspberrypi.local
+
+ssh -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no ${PI_USER}@${PI_ADDRESS} <<EOF
+    sudo su -
+    # install required packages
+    apt update
+    apt install -y \
+        apt-transport-https \
+        ca-certificates \
+        curl \
+        gnupg2 \
+        linux-headers-4.9.0-6-all \
+        raspberrypi-kernel-headers \
+        software-properties-common
+
+    # add ssh key
+    mkdir /home/pi/.ssh
+    echo "${PUBKEY}" > /home/pi/.ssh/authorized_keys
+    chown -R pi:pi /home/pi/.ssh
+
+    # disable password ssh
+    sed -i "s/#PasswordAuthentication yes/PasswordAuthentication no/g" /etc/ssh/sshd_config
+    sed -i "s/#PermitEmptyPassword/PermitEmptyPassword/g" /etc/ssh/sshd_config
+    sed -i "s/UsePAM yes/UsePAM no/g" /etc/ssh/sshd_config
+    service ssh reload
+
+    # get the docker signing key for package
+    curl -fsSL https://download.docker.com/linux/raspbian/gpg | apt-key add -
+
+    # add the docker official repo
+    echo "deb [arch=armhf] https://download.docker.com/linux/raspbian stretch stable" | tee /etc/apt/sources.list.d/docker.list
+
+    # install Docker
+    apt update
+    apt install docker-ce -y
+
+    # start docker and enable at boot
+    systemctl enable docker
+    systemctl start docker
+
+    # add pi user to docker group
+    usermod -aG docker pi
+
+    # set new hostname for the system
+    sed -i "s/raspberrypi/${ID}/g" /etc/hosts
+    hostnamectl set-hostname "${ID}"
+EOF
+
+# reboot the pi
+ssh -i ${SCREAMINGDATA_KEY_LOCATION} -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no ${PI_USER}@${PI_ADDRESS} "sudo shutdown --reboot 0 ; exit"
+
+# print success
+echo ""
+echo "Successfully baked Pi with ID: ${ID}"
+echo "You can SSH into the Pi at: ${PI_USER}@${ID}.local"
